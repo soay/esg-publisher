@@ -144,7 +144,8 @@ def deleteGatewayDatasetVersion(versionName, gatewayOperation, service, session,
 DELETE = 1
 UNPUBLISH = 2
 NO_OPERATION = 3
-def deleteDatasetList(datasetNames, Session, gatewayOperation=UNPUBLISH, thredds=True, las=False, deleteInDatabase=False, progressCallback=None, deleteAll=False, republish=False, reinitThredds=True, restInterface=False):
+def deleteDatasetList(datasetNames, Session, gatewayOperation=UNPUBLISH, thredds=True, las=False, deleteInDatabase=False, progressCallback=None,
+                      deleteAll=False, republish=False, reinitThredds=True, restInterface=False, pid_connector=None):
     """
     Delete or retract a list of datasets:
 
@@ -193,6 +194,9 @@ def deleteDatasetList(datasetNames, Session, gatewayOperation=UNPUBLISH, thredds
 
     restInterface
       Boolean flag. If True, publish datasets with the RESTful publication services.
+
+    pid_connector
+        esgfpid.Connector object to register PIDs
 
     """
 
@@ -271,6 +275,13 @@ def deleteDatasetList(datasetNames, Session, gatewayOperation=UNPUBLISH, thredds
                         event = Event(dset.name, versionObj.version, DELETE_THREDDS_CATALOG_EVENT)
                         dset.events.append(event)
                     session.delete(catalog)
+
+        # send unpublication to handle server
+        if pid_connector:
+            if version > -1:
+                pid_connector.unpublish_one_version(drs_id=datasetName, version_number=version)
+            else:
+                pid_connector.unpublish_all_versions(drs_id=datasetName)
 
         session.commit()
         if reinitThredds:

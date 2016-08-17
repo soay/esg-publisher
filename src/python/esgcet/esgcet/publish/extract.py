@@ -8,6 +8,7 @@ from esgcet.model import *
 from esgcet.exceptions import *
 from esgcet.config import splitLine, getConfig
 from utility import getTypeAndLen, issueCallback, compareFiles, checksum, extraFieldsGet
+from esgfpid import make_handle_from_drsid_and_versionnumber
 
 NAME=0
 LENGTH=1
@@ -22,7 +23,9 @@ REPLACE_OP=5
 # When translating numpy arrays (e.g., dimension values) to strings, don't include newlines
 numpy.set_printoptions(threshold=numpy.inf, linewidth=numpy.inf)
 
-def extractFromDataset(datasetName, fileIterator, dbSession, handler, cfHandler, aggregateDimensionName=None, offline=False, operation=CREATE_OP, progressCallback=None, stopEvent=None, keepVersion=False, newVersion=None, extraFields=None, masterGateway=None, comment=None, useVersion=-1, forceRescan=False, nodbwrite=False, **context):
+def extractFromDataset(datasetName, fileIterator, dbSession, handler, cfHandler, aggregateDimensionName=None, offline=False, operation=CREATE_OP,
+                       progressCallback=None, stopEvent=None, keepVersion=False, newVersion=None, extraFields=None, masterGateway=None, comment=None,
+                       useVersion=-1, forceRescan=False, nodbwrite=False, pid_connector=None, **context):
     """
     Extract metadata from a dataset represented by a list of files, add to a database. Populates the database tables:
 
@@ -88,6 +91,9 @@ def extractFromDataset(datasetName, fileIterator, dbSession, handler, cfHandler,
 
     forceRescan
       Boolean, if True force all files to be rescanned on an update.
+
+    pid_connector
+        ESGF_PID_connector object to register PIDs
 
     context
       A dictionary with keys ``project``, ``model``, ``experiment``, etc. The context consists of all fields needed to uniquely define the dataset.
@@ -226,7 +232,29 @@ def extractFromDataset(datasetName, fileIterator, dbSession, handler, cfHandler,
             datasetTechNotes = dset.dataset_tech_notes
         if hasattr(dset, "dataset_tech_notes_title"):
             datasetTechNotesTitle = dset.dataset_tech_notes_title
-        newDsetVersionObj = DatasetVersionFactory(dset, version=newVersion, creation_time=createTime, comment=comment, tech_notes=datasetTechNotes, tech_notes_title=datasetTechNotesTitle)
+
+        # if project uses PIDs, generate PID for dataset
+        dataset_pid = None
+        if pid_connector:
+            dataset_pid = make_handle_from_drsid_and_versionnumber(drs_id=datasetName,
+                                                                   version_number=newVersion,
+                                                                   prefix=config.get(section, 'pid_prefix'))
+            info("Created PID for dataset %s.v%s: %s " % (datasetName, newVersion, dataset_pid))
+
+        # if project uses citation, build citation url
+        citation_url = None
+        if config.has_option(section, 'citation_url'):
+            pattern = handler.getFilters(option='dataset_id')
+            attributes = re.match(pattern[0], datasetName).groupdict()
+            if 'version' not in attributes:
+                attributes['version'] = str(newVersion)
+            if 'dataset_id' not in attributes:
+                attributes['dataset_id'] = datasetName
+            citation_url = config.get(section, 'citation_url', 0, attributes)
+
+        newDsetVersionObj = DatasetVersionFactory(dset, version=newVersion, creation_time=createTime, comment=comment, tech_notes=datasetTechNotes,
+                                                  tech_notes_title=datasetTechNotesTitle, pid=dataset_pid, citation_url=citation_url)
+
         info("New dataset version = %d"%newDsetVersionObj.version)
         for var in dset.variables:
             session.delete(var)
@@ -627,7 +655,7 @@ def extractFromFile(dataset, openfile, fileobj, session, cfHandler, aggdimName=N
         debug("%s%s"%(varname, `varshape`))
 
         # Check varlocate
-        if varlocatedict.has_key(varname) and not re.match(varlocatedict[varname], os.path.basename(fileVersion.location)):
+        if varlocatedict.has_key(varname) and not re.match(varlocatedict[varname].strip(), os.path.basename(fileVersion.location)):
             debug("Skipping variable %s in %s"%(varname, fileVersion.location))
             continue
 
@@ -684,6 +712,13 @@ def extractFromFile(dataset, openfile, fileobj, session, cfHandler, aggdimName=N
         attribute = FileAttribute(attname, map_to_charset(attvalue), atttype, attlen)
         fileobj.attributes.append(attribute)
         if attname=='tracking_id':
+
+            ##########################################
+            #TODO: DELETE -- only for testing!!!
+            if '/' not in attvalue:
+                attvalue = 'hdl:21.14100/' + attvalue
+            ##########################################
+
             fileVersion.tracking_id = attvalue
         debug('.%s = %s'%(attname, attvalue))
 

@@ -5,6 +5,8 @@ import os
 import getopt
 import logging
 import string
+import esgfpid
+import urlparse
 
 from esgcet.model import *
 from esgcet.publish import deleteDatasetList, updateThreddsMasterCatalog, reinitializeThredds, DELETE, UNPUBLISH, NO_OPERATION, readDatasetMap,\
@@ -88,6 +90,9 @@ Options:
         Use this option with caution, as it will leave the database and THREDDS catalogs in an inconsistent
         state.
 
+    --project project_id:
+        Project identifier. This option is mandatory.
+
     --rest-api
         Publish using the RESTful publication services. The configuration file option ``rest_service_url''
         defines the service location. If it is undefined, the service location is
@@ -142,7 +147,9 @@ def republishDataset(result, Session, thredds, gatewayOp):
 def main(argv):
 
     try:
-        args, lastargs = getopt.getopt(argv, "hi:", ['database-delete', 'database-only', 'echo-sql', 'map=', 'no-republish', 'no-thredds-reinit', 'skip-gateway', 'skip-index', 'las', 'log=', 'rest-api', 'skip-thredds', 'sync-thredds', 'use-list='])
+        args, lastargs = getopt.getopt(argv, "hi:", ['database-delete', 'database-only', 'echo-sql', 'map=', 'no-republish', 'no-thredds-reinit',
+                                                     'skip-gateway', 'skip-index', 'las', 'log=', 'project=', 'rest-api', 'skip-thredds',
+                                                     'sync-thredds', 'use-list='])
     except getopt.error:
         print sys.exc_value
         print usage
@@ -164,6 +171,8 @@ def main(argv):
     syncThredds = False
     useList = False
     threddsReinit = True
+    projectName = None
+
     for flag, arg in args:
         if flag=='--database-delete':
             deleteDset = True
@@ -197,6 +206,8 @@ def main(argv):
             republish = False
         elif flag=='--no-thredds-reinit':
             threddsReinit = False
+        elif flag == '--project':
+            projectName = arg
         elif flag=='--rest-api':
             restApi = True
         elif flag=='--skip-thredds':
@@ -206,6 +217,10 @@ def main(argv):
         elif flag=='--use-list':
             useList = True
             useListPath = arg
+
+    # The project must be specified
+    if projectName is None:
+        raise ESGPublishError("Must specify project with --project")
 
     if gatewayOp!=NO_OPERATION and unpublishOnGateway:
         gatewayOp = UNPUBLISH
@@ -223,64 +238,100 @@ def main(argv):
     if restApi is None:
         restApi = config.getboolean('DEFAULT', 'use_rest_api', default=False)
 
-    if datasetMap is None and mapfileDir is None:
-        if not useList:
-            datasetNames = [parseDatasetVersionId(item) for item in lastargs]
-        else:
-            if useListPath=='-':
-                namelist = sys.stdin
+    # Check if project uses PIDs and start messaging thread
+    pid_connector = None
+    try:
+        project_section = "project:%s" % projectName
+        pid_prefix = config.get(project_section, 'pid_prefix', default=None)
+        if pid_prefix:
+            pid_data_node = urlparse.urlparse(config.get('DEFAULT', 'thredds_url')).netloc
+            pid_messaging_service_urls = config.get(project_section, 'pid_messaging_service_urls').split(',')
+            pid_messaging_service_exchange_name = config.get(project_section, 'pid_messaging_service_exchange_name')
+            pid_messaging_service_username = config.get(project_section, 'pid_messaging_service_username')
+            pid_messaging_service_password = config.get(project_section, 'pid_messaging_service_password')
+            hessian_service_url = config.get('DEFAULT', 'hessian_service_url', default=None)
+            if hessian_service_url:
+                pid_consumer_solr_url = urlparse.urlparse(hessian_service_url).netloc
+            pid_connector = esgfpid.Connector(handle_prefix=pid_prefix,
+                                              messaging_service_urls=pid_messaging_service_urls,
+                                              messaging_service_exchange_name=pid_messaging_service_exchange_name,
+                                              data_node=pid_data_node,
+                                              messaging_service_username=pid_messaging_service_username,
+                                              messaging_service_password=pid_messaging_service_password,
+                                              consumer_solr_url=pid_consumer_solr_url)
+            pid_connector.start_messaging_thread()
+
+        if datasetMap is None and mapfileDir is None:
+            if not useList:
+                datasetNames = [parseDatasetVersionId(item) for item in lastargs]
             else:
-                namelist = open(useListPath)
-            datasetNames = []
-            for line in namelist.readlines():
-                versionId = parseDatasetVersionId(line.strip())
-                datasetNames.append(versionId)
-        result = deleteDatasetList(datasetNames, Session, gatewayOp, thredds, las, deleteDset, deleteAll=deleteAll, republish=republish, reinitThredds=threddsReinit, restInterface=restApi)
+                if useListPath=='-':
+                    namelist = sys.stdin
+                else:
+                    namelist = open(useListPath)
+                datasetNames = []
+                for line in namelist.readlines():
+                    versionId = parseDatasetVersionId(line.strip())
+                    datasetNames.append(versionId)
+            result = deleteDatasetList(datasetNames, Session, gatewayOp, thredds, las, deleteDset, deleteAll=deleteAll, republish=republish,
+                                       reinitThredds=threddsReinit, restInterface=restApi, pid_connector=pid_connector)
 
-    elif mapfileDir is not None:
-        for root, dirs, files in os.walk(mapfileDir, followlinks=True):
-            for mapfile in files:
-                try:
-                    datasetMap = readDatasetMap(os.path.join(root, mapfile))
-                except:
-                    error("Skipping %s: File does not match ESGF mapfile format." %os.path.join(root, mapfile))
-                    continue
-                datasetNames = datasetMap.keys()
-                datasetNames.sort()
-                result = deleteDatasetList(datasetNames, Session, gatewayOp, thredds, las, deleteDset, deleteAll=deleteAll, republish=republish, reinitThredds=False, restInterface=restApi)
+        elif mapfileDir is not None:
+            for root, dirs, files in os.walk(mapfileDir, followlinks=True):
+                for mapfile in files:
+                    try:
+                        datasetMap = readDatasetMap(os.path.join(root, mapfile))
+                    except:
+                        error("Skipping %s: File does not match ESGF mapfile format." %os.path.join(root, mapfile))
+                        continue
+                    datasetNames = datasetMap.keys()
+                    datasetNames.sort()
+                    result = deleteDatasetList(datasetNames, Session, gatewayOp, thredds, las, deleteDset, deleteAll=deleteAll, republish=republish,
+                                               reinitThredds=False, restInterface=restApi, pid_connector=pid_connector)
 
-                if republish:
-                    republishDataset(result, Session, thredds, gatewayOp)
+                    if republish:
+                        republishDataset(result, Session, thredds, gatewayOp)
 
-        # reinitialize THREDDS catalog only once after processing all mapfiles
-        if threddsReinit:
-            updateThreddsMasterCatalog(Session)
-            result = reinitializeThredds()
+            # reinitialize THREDDS catalog only once after processing all mapfiles
+            if threddsReinit:
+                updateThreddsMasterCatalog(Session)
+                result = reinitializeThredds()
 
-    else:
-        datasetNames = datasetMap.keys()
-        datasetNames.sort()
+        else:
+            datasetNames = datasetMap.keys()
+            datasetNames.sort()
 
-        result = deleteDatasetList(datasetNames, Session, gatewayOp, thredds, las, deleteDset, deleteAll=deleteAll, republish=republish, reinitThredds=threddsReinit, restInterface=restApi)
+            result = deleteDatasetList(datasetNames, Session, gatewayOp, thredds, las, deleteDset, deleteAll=deleteAll, republish=republish,
+                                       reinitThredds=threddsReinit, restInterface=restApi, pid_connector=pid_connector)
 
-        if republish:
-            republishDataset(result, Session, thredds, gatewayOp)
+            if republish:
+                republishDataset(result, Session, thredds, gatewayOp)
 
-    # Synchronize database and THREDDS catalogs
-    if syncThredds:
-        threddsRoot = config.get('DEFAULT', 'thredds_root')
+        # Synchronize database and THREDDS catalogs
+        if syncThredds:
+            threddsRoot = config.get('DEFAULT', 'thredds_root')
 
-        # Make a dictionary of catalogs from the database
-        session = Session()
-        subcatalogs = session.query(Catalog).select_from(join(Catalog, Dataset, Catalog.dataset_name==Dataset.name)).all()
-        catdict = {}
-        for catalog in subcatalogs:
-            location = os.path.join(threddsRoot, catalog.location)
-            catdict[location] = 1
-        session.close()
+            # Make a dictionary of catalogs from the database
+            session = Session()
+            subcatalogs = session.query(Catalog).select_from(join(Catalog, Dataset, Catalog.dataset_name==Dataset.name)).all()
+            catdict = {}
+            for catalog in subcatalogs:
+                location = os.path.join(threddsRoot, catalog.location)
+                catdict[location] = 1
+            session.close()
 
-        # Scan all XML files in the threddsroot
-        os.path.walk(threddsRoot, cleanupCatalogs, catdict)
+            # Scan all XML files in the threddsroot
+            os.path.walk(threddsRoot, cleanupCatalogs, catdict)
+
+        # finish PID messaging queue
+        if pid_connector:
+            pid_connector.finish_messaging_thread()
+            pid_connector.force_finish_messaging_thread()
+
+    except:
+        if pid_connector:
+            pid_connector.force_finish_messaging_thread()
+        raise
 
 if __name__=='__main__':
     main(sys.argv[1:])
