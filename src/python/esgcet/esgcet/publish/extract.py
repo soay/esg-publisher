@@ -239,18 +239,10 @@ def extractFromDataset(datasetName, fileIterator, dbSession, handler, cfHandler,
             dataset_pid = make_handle_from_drsid_and_versionnumber(drs_id=datasetName,
                                                                    version_number=newVersion,
                                                                    prefix=config.get(section, 'pid_prefix'))
-            info("Created PID for dataset %s.v%s: %s " % (datasetName, newVersion, dataset_pid))
+            info("Assigned PID %s for dataset %s.v%s " % (dataset_pid, datasetName, newVersion))
 
         # if project uses citation, build citation url
-        citation_url = None
-        if config.has_option(section, 'citation_url'):
-            pattern = handler.getFilters(option='dataset_id')
-            attributes = re.match(pattern[0], datasetName).groupdict()
-            if 'version' not in attributes:
-                attributes['version'] = str(newVersion)
-            if 'dataset_id' not in attributes:
-                attributes['dataset_id'] = datasetName
-            citation_url = config.get(section, 'citation_url', 0, attributes)
+        citation_url = handler.get_citation_url(section, config, datasetName, newVersion)
 
         newDsetVersionObj = DatasetVersionFactory(dset, version=newVersion, creation_time=createTime, comment=comment, tech_notes=datasetTechNotes,
                                                   tech_notes_title=datasetTechNotesTitle, pid=dataset_pid, citation_url=citation_url)
@@ -647,7 +639,7 @@ def extractFromFile(dataset, openfile, fileobj, session, cfHandler, aggdimName=N
     varlocatedict = {}
     if varlocate is not None:
         for varname, pattern in varlocate:
-            varlocatedict[varname] = pattern
+            varlocatedict[varname.strip()] = pattern.strip()
 
     # For each variable in the file:
     for varname in openfile.inquireVariableList():

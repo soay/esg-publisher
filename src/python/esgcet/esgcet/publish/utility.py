@@ -11,7 +11,9 @@ import logging
 import subprocess
 import filecmp
 import urlparse
-from esgcet.config import getHandler, getHandlerByName, splitLine, getConfig
+import esgfpid
+
+from esgcet.config import getHandler, getHandlerByName, splitLine, getConfig, getThreddsServiceSpecs
 from esgcet.exceptions import *
 from esgcet.messaging import debug, info, warning, error, critical, exception
 
@@ -978,3 +980,40 @@ def getRestServiceURL():
         host = urlparse.urlparse(hessianServiceURL).netloc
         serviceURL = urlparse.urlunparse(('https', host, '/esg-search/ws', '', '', ''))
     return serviceURL
+
+
+def establish_pid_connection(pid_prefix, project_section, config, handler, publish=True):
+    """Establish a connection to the PID service
+
+    pid_prefix
+        PID prefix to be used for given project
+
+    project_section
+        Name of section for project in ini file
+
+    config
+        Loaded config file(s)
+
+    handler
+        Project handler to be used for given project
+
+    publish
+        Flag to trigger publication and unpublication
+    """
+    pid_ms_urls, pid_ms_exchange, pid_ms_user, pid_ms_pass = handler.get_pid_config(project_section, config)
+    pid_data_node = urlparse.urlparse(config.get('DEFAULT', 'thredds_url')).netloc
+    thredds_service_path = None
+    if publish:
+        thredds_file_specs = getThreddsServiceSpecs(config, 'DEFAULT', 'thredds_file_services')
+        for serviceType, base, name, compoundName in thredds_file_specs:
+            if serviceType == 'HTTPServer':
+                thredds_service_path = base
+                break
+    pid_connector = esgfpid.Connector(handle_prefix=pid_prefix,
+                                      messaging_service_urls=pid_ms_urls,
+                                      messaging_service_exchange_name=pid_ms_exchange,
+                                      data_node=pid_data_node,
+                                      thredds_service_path=thredds_service_path,
+                                      messaging_service_username=pid_ms_user,
+                                      messaging_service_password=pid_ms_pass)
+    return pid_connector
