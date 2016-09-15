@@ -298,6 +298,7 @@ class IPCC5Handler(BasicHandler):
         #    info("Skipping variable %s (in file %s)"%(variable.short_name, fileobj.getLocation()))
         return result
 
+    # TODO! remove the following for production
     def check_pid_avail(self, project_section, config):
         """ Returns the pid_prefix
 
@@ -312,7 +313,7 @@ class IPCC5Handler(BasicHandler):
 
         pid_prefix = config.get(project_section, 'pid_prefix', default=None)
         if not pid_prefix:
-            warning("Project uses PIDs but no PID configs found in section %s, using the default" % project_section)
+            info("No PID configs found in section %s, using the default" % project_section)
             pid_prefix = '21.14100'
         return pid_prefix
 
