@@ -1,7 +1,8 @@
-"Handle IPCC5 data file metadata"
+"Handle CMIP6 data file metadata"
 
 import os
 import re
+import urlparse
 
 from cmip5_product import getProduct
 
@@ -19,6 +20,9 @@ WARN = False
 
 from cfchecker import *
 
+cmorAttributes = {
+    'time_frequency': 'frequency',
+    }
 
 class CMIP6Handler(BasicHandler):
 
@@ -33,6 +37,18 @@ class CMIP6Handler(BasicHandler):
         fileobj = BasicHandler.openPath(self, path)
         fileobj.path = path
         return fileobj
+
+
+    def readContext(self, cdfile, model=''):
+        "Get a dictionary of keys from an open file"
+        result = BasicHandler.readContext(self, cdfile)
+        f = cdfile.file
+
+        for key, value in cmorAttributes.items():
+            try:
+                result[key] = getattr(f, value)
+            except:
+                pass
 
 
     def validateFile(self, fileobj):
@@ -114,3 +130,55 @@ class CMIP6Handler(BasicHandler):
 
             raise ESGPublishError("File %s failed the CV check"%f)
 
+
+    def check_pid_avail(self, project_section, config):
+        """ Returns the pid_prefix
+
+         project_section
+            The name of the project section in the ini file
+
+        config
+            The configuration (ini files)
+        """
+        pid_data_node = urlparse.urlparse(config.get('DEFAULT', 'thredds_url')).netloc
+        hessian_service_url = config.get('DEFAULT', 'hessian_service_url', default=None)
+
+        pid_prefix = config.get(project_section, 'pid_prefix', default=None)
+        if not pid_prefix:
+            info("No PID configs found in section %s, using the defaults" % project_section)
+            pid_prefix = '21.14100'
+        return pid_prefix
+
+
+    def get_pid_config(self, project_section, config):
+        """ Returns the project specific pid config
+
+         project_section
+            The name of the project section in the ini file
+
+        config
+            The configuration (ini files)
+        """
+        pid_ms_urls = config.get(project_section, 'pid_messaging_service_urls', default='handle-esgf.dkrz.de').split(',')
+        pid_ms_exchange = config.get(project_section, 'pid_messaging_service_exchange_name', default='esgffedtest')
+        pid_ms_user = config.get(project_section, 'pid_messaging_service_username', default='publisher')
+        pid_ms_pass = config.get(project_section, 'pid_messaging_service_password', default=None)
+        return pid_ms_urls, pid_ms_exchange, pid_ms_user, pid_ms_pass
+
+
+    def get_citation_url(self, project_section, config, dataset_name, dataset_version):
+        """ Returns the citation_url if a project uses citation, otherwise returns None
+
+         project_section
+            The name of the project section in the ini file
+
+        config
+            The configuration (ini files)
+
+        dataset_name
+            Name of the dataset
+
+        dataset_version
+            Version of the dataset
+        """
+        return 'http://cera-www.dkrz.de/WDCC/meta/CMIP6/%s.v%s' % (dataset_name, dataset_version)

@@ -21,6 +21,18 @@ from esgcet.messaging import debug, info, warning, error, critical, exception
 # By default, os.stat(path).st_mtime returns a float.
 os.stat_float_times(False)
 
+
+class bcolors:
+    HEADER = '\033[95m'
+    OKBLUE = '\033[94m'
+    OKGREEN = '\033[92m'
+    WARNING = '\033[93m'
+    FAIL = '\033[91m'
+    ENDC = '\033[0m'
+    BOLD = '\033[1m'
+    UNDERLINE = '\033[4m'
+
+
 def getTypeAndLen(att):
     """Get the type descriptor of an attribute.
     """
@@ -746,6 +758,12 @@ def iterateOverDatasets(projectName, dmap, directoryMap, datasetNames, Session, 
             else:
                 context[name] = value
 
+        # add version to context to allow it to be a mandatory field
+        if versionno > -1:
+            context['dataset_version'] = versionno
+        elif newVersion is not None:
+            context['dataset_version'] = newVersion
+
         # Update the handler context and fill in default values
         handler.updateContext(context, True)
 
@@ -982,11 +1000,14 @@ def getRestServiceURL():
     return serviceURL
 
 
-def establish_pid_connection(pid_prefix, project_section, config, handler, publish=True):
+def establish_pid_connection(pid_prefix, test_publication, project_section, config, handler, publish=True):
     """Establish a connection to the PID service
 
     pid_prefix
         PID prefix to be used for given project
+
+    test_publication
+        Boolean to flag PIDs as test
 
     project_section
         Name of section for project in ini file
@@ -1015,5 +1036,6 @@ def establish_pid_connection(pid_prefix, project_section, config, handler, publi
                                       data_node=pid_data_node,
                                       thredds_service_path=thredds_service_path,
                                       messaging_service_username=pid_ms_user,
-                                      messaging_service_password=pid_ms_pass)
+                                      messaging_service_password=pid_ms_pass,
+                                      test_publication=test_publication)
     return pid_connector

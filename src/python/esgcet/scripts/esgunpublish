@@ -247,7 +247,7 @@ def main(argv):
         project_section = "project:%s" % projectName
         pid_prefix = handler.check_pid_avail(project_section, config)
         if pid_prefix:
-            pid_connector = establish_pid_connection(pid_prefix, project_section, config, handler, publish=False)
+            pid_connector = establish_pid_connection(pid_prefix, False, project_section, config, handler, publish=False)
             pid_connector.start_messaging_thread()
 
         if datasetMap is None and mapfileDir is None:

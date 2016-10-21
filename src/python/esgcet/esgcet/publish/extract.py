@@ -8,7 +8,6 @@ from esgcet.model import *
 from esgcet.exceptions import *
 from esgcet.config import splitLine, getConfig
 from utility import getTypeAndLen, issueCallback, compareFiles, checksum, extraFieldsGet
-from esgfpid import make_handle_from_drsid_and_versionnumber
 
 NAME=0
 LENGTH=1
@@ -220,7 +219,7 @@ def extractFromDataset(datasetName, fileIterator, dbSession, handler, cfHandler,
 
     dset.reaggregate = False
 
-    if newVersion<existingVersion:
+    if newVersion<=existingVersion:
         versionList = dset.getVersionList()
         if newVersion in versionList:
             addNewVersion = False
@@ -236,10 +235,8 @@ def extractFromDataset(datasetName, fileIterator, dbSession, handler, cfHandler,
         # if project uses PIDs, generate PID for dataset
         dataset_pid = None
         if pid_connector:
-            dataset_pid = make_handle_from_drsid_and_versionnumber(drs_id=datasetName,
-                                                                   version_number=newVersion,
-                                                                   prefix=config.get(section, 'pid_prefix'))
-            info("Assigned PID %s for dataset %s.v%s " % (dataset_pid, datasetName, newVersion))
+            dataset_pid = pid_connector.make_handle_from_drsid_and_versionnumber(drs_id=datasetName, version_number=newVersion)
+            info("Assigned PID to dataset %s.v%s: %s " % (datasetName, newVersion, dataset_pid))
 
         # if project uses citation, build citation url
         citation_url = handler.get_citation_url(section, config, datasetName, newVersion)

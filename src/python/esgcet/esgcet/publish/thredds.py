@@ -926,7 +926,7 @@ def _generateThreddsV2(datasetName, outputFile, handler, session, dset, context,
     if dsetVersionObj.pid is not None:
         documentation = SE(datasetElem, "documentation", type="pid")
         SE(datasetElem, "property", name="pid", value=dsetVersionObj.pid)
-        documentation.set(_XLINK + "href", 'hdl:%s' %dsetVersionObj.pid)
+        documentation.set(_XLINK + "href", '%s' %dsetVersionObj.pid)
         documentation.set(_XLINK + "title", "PID")
 
     datasetIdProp = SE(datasetElem, "property", name="dataset_id", value=datasetName)
@@ -940,7 +940,7 @@ def _generateThreddsV2(datasetName, outputFile, handler, session, dset, context,
         SE(datasetElem, "property", name="is_replica", value="true")
 
     for name in handler.getFieldNames():
-        if handler.isThreddsProperty(name):
+        if handler.isThreddsProperty(name) and name != "dataset_version":
 
             vals_lst = []
             # delimited-values here
@@ -1238,7 +1238,10 @@ def generateThreddsOutputPath(datasetName, version, dbSession, handler, createDi
 
     # Create the subdirectory if necessary
     if createDirectory and not os.path.exists(lastSubdir):
-        os.mkdir(lastSubdir, 0775)
+        try:
+            os.mkdir(lastSubdir, 0775)
+        except OSError:
+            assert os.path.exists(lastSubdir)
 
     # Build the catalog name
     result = os.path.join(lastSubdir, threddsCatalogBasename)

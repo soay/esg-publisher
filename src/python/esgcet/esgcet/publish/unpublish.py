@@ -266,6 +266,9 @@ def deleteDatasetList(datasetNames, Session, gatewayOperation=UNPUBLISH, thredds
             if dset is None:
                 continue
             for versionObj in versionObjs:
+                # send unpublication info to handle server
+                if pid_connector:
+                    pid_connector.unpublish_one_version(drs_id=datasetName, version_number=versionObj.version)
                 catalog = session.query(Catalog).filter_by(dataset_name=dset.name, version=versionObj.version).first()
                 if catalog is not None:
                     path = os.path.join(threddsRoot, catalog.location)
@@ -275,13 +278,6 @@ def deleteDatasetList(datasetNames, Session, gatewayOperation=UNPUBLISH, thredds
                         event = Event(dset.name, versionObj.version, DELETE_THREDDS_CATALOG_EVENT)
                         dset.events.append(event)
                     session.delete(catalog)
-
-        # send unpublication to handle server
-        if pid_connector:
-            if version > -1:
-                pid_connector.unpublish_one_version(drs_id=datasetName, version_number=version)
-            else:
-                pid_connector.unpublish_all_versions(drs_id=datasetName)
 
         session.commit()
         if reinitThredds:

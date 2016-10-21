@@ -333,7 +333,7 @@ class IPCC5Handler(BasicHandler):
             pid_ms_urls = ['handle-esgf.dkrz.de'] #!TODO change placeholder
         pid_ms_exchange = config.get(project_section, 'pid_messaging_service_exchange_name', default=None)
         if not pid_ms_exchange:
-            pid_ms_exchange = ['esgffedtest'] #!TODO change placeholder
+            pid_ms_exchange = 'esgffedtest' #!TODO change placeholder
         pid_ms_user = config.get(project_section, 'pid_messaging_service_username', default=None)
         if not pid_ms_user:
             pid_ms_user = 'publisher' #!TODO change placeholder

@@ -865,9 +865,10 @@ class ProjectHandler(object):
             # Map to case-sensitive options
             experimentOptions = self.mapValidFieldOptions('experiment', experimentOptions)
             if idFormat.find('%(experiment)s')!=-1 and experimentOptions is not None:
-                optionOr = reduce(lambda x,y: x+'|'+y, experimentOptions)
-                experimentPattern = r'(?P<experiment>%s)'%optionOr
-                newinit = newinit.replace('(?P<experiment>[^.]*)', experimentPattern)
+                if len(experimentOptions) > 0:
+                    optionOr = reduce(lambda x,y: x+'|'+y, experimentOptions)
+                    experimentPattern = r'(?P<experiment>%s)'%optionOr
+                    newinit = newinit.replace('(?P<experiment>[^.]*)', experimentPattern)
             
             if newinit[-1]!='$':
                 newinit += '$'
