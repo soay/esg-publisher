@@ -701,13 +701,6 @@ def extractFromFile(dataset, openfile, fileobj, session, cfHandler, aggdimName=N
         attribute = FileAttribute(attname, map_to_charset(attvalue), atttype, attlen)
         fileobj.attributes.append(attribute)
         if attname=='tracking_id':
-
-            ##########################################
-            #TODO: DELETE -- only for testing!!!
-            if '/' not in attvalue:
-                attvalue = 'hdl:21.14100/' + attvalue
-            ##########################################
-
             fileVersion.tracking_id = attvalue
         debug('.%s = %s'%(attname, attvalue))
 
