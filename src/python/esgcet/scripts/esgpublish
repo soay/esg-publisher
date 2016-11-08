@@ -473,7 +473,7 @@ def main(argv):
     try:
         if not publishOnly or thredds:
             project_section = "project:%s" % projectName
-            pid_prefix = handler.check_pid_avail(project_section, config, version)
+            pid_prefix = handler.check_pid_avail(project_section, config, version=version)
             if pid_prefix:
                 pid_connector = establish_pid_connection(pid_prefix, test_publication, project_section, config, handler, publish=True)
                 pid_connector.start_messaging_thread()

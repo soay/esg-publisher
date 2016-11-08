@@ -989,7 +989,7 @@ class ProjectHandler(object):
         return True
 
 
-    def check_pid_avail(self, project_section, version=None):
+    def check_pid_avail(self, project_section, config, version=None):
         """ Returns the pid_prefix if project uses PIDs, otherwise returns None
 
          project_section
