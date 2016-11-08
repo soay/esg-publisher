@@ -1021,7 +1021,7 @@ def establish_pid_connection(pid_prefix, test_publication, project_section, conf
     publish
         Flag to trigger publication and unpublication
     """
-    pid_ms_urls, pid_ms_exchange, pid_ms_user, pid_ms_pass = handler.get_pid_config(project_section, config)
+    pid_ms_exchange_name, pid_ms_urls_open, pid_ms_username_open, pid_ms_url_trusted, pid_ms_username_trusted, pid_ms_password = handler.get_pid_config(project_section, config)
     pid_data_node = urlparse.urlparse(config.get('DEFAULT', 'thredds_url')).netloc
     thredds_service_path = None
     if publish:
@@ -1030,12 +1030,16 @@ def establish_pid_connection(pid_prefix, test_publication, project_section, conf
             if serviceType == 'HTTPServer':
                 thredds_service_path = base
                 break
+
     pid_connector = esgfpid.Connector(handle_prefix=pid_prefix,
-                                      messaging_service_urls=pid_ms_urls,
-                                      messaging_service_exchange_name=pid_ms_exchange,
+                                      messaging_service_exchange_name=pid_ms_exchange_name,
+                                      messaging_service_urls_open=pid_ms_urls_open,
+                                      messaging_service_username_open=pid_ms_username_open,
+                                      messaging_service_url_trusted=pid_ms_url_trusted,
+                                      messaging_service_username_trusted=pid_ms_username_trusted,
+                                      messaging_service_password=pid_ms_password,
                                       data_node=pid_data_node,
                                       thredds_service_path=thredds_service_path,
-                                      messaging_service_username=pid_ms_user,
-                                      messaging_service_password=pid_ms_pass,
                                       test_publication=test_publication)
     return pid_connector
+

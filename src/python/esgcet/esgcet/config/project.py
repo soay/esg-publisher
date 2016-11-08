@@ -988,7 +988,8 @@ class ProjectHandler(object):
         """
         return True
 
-    def check_pid_avail(self, project_section, config):
+
+    def check_pid_avail(self, project_section, version=None):
         """ Returns the pid_prefix if project uses PIDs, otherwise returns None
 
          project_section
@@ -996,9 +997,13 @@ class ProjectHandler(object):
 
         config
             The configuration (ini files)
+
+        version
+            Integer or Dict with dataset versions
         """
         pid_prefix = config.get(project_section, 'pid_prefix', default=None)
         return pid_prefix
+
 
     def get_pid_config(self, project_section, config):
         """ Returns the project specific pid config
@@ -1009,13 +1014,18 @@ class ProjectHandler(object):
         config
             The configuration (ini files)
         """
-        pid_ms_urls = config.get(project_section, 'pid_messaging_service_urls', default=None)
-        if pid_ms_urls:
-            pid_ms_urls = pid_ms_urls.split(',')
-            pid_ms_exchange = config.get(project_section, 'pid_messaging_service_exchange_name', default=None)
-            pid_ms_user = config.get(project_section, 'pid_messaging_service_username', default=None)
-            pid_ms_pass = config.get(project_section, 'pid_messaging_service_password', default=None)
-        return pid_ms_urls, pid_ms_exchange, pid_ms_user, pid_ms_pass
+        # get the PID configs
+        pid_ms_exchange_name = 'esgffed-exchange'
+
+        pid_ms_urls_open = config.get(project_section, 'pid_messaging_service_urls_open', default=None)
+        pid_ms_username_open = config.get(project_section, 'pid_messaging_service_username_open', default=None)
+
+        pid_ms_url_trusted = config.get(project_section, 'pid_messaging_service_url_trusted', default=None)
+        pid_ms_username_trusted = config.get(project_section, 'pid_messaging_service_username_trusted', default=None)
+        pid_ms_password = config.get(project_section, 'pid_messaging_service_password', default=None)
+
+        return pid_ms_exchange_name, pid_ms_urls_open, pid_ms_username_open, pid_ms_url_trusted, pid_ms_username_trusted, pid_ms_password
+
 
     def get_citation_url(self, project_section, config, dataset_name, dataset_version):
         """ Returns the citation_url if a project uses citation, otherwise returns None
@@ -1042,7 +1052,7 @@ class ProjectHandler(object):
                     attributes['dataset_id'] = dataset_name
                 return config.get(project_section, 'citation_url', 0, attributes)
             except:
-                warning('Can not generate a citation url for %s' % dataset_name)
+                warning('Unable to generate a citation url for %s' % dataset_name)
                 return None
         else:
             return None

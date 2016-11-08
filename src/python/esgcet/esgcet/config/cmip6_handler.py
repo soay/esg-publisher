@@ -1,4 +1,4 @@
-"Handle CMIP6 data file metadata"
+""""Handle CMIP6 data file metadata"""
 
 import os
 import re
@@ -20,6 +20,8 @@ WARN = False
 
 from cfchecker import *
 
+version_pattern = re.compile('20\d{2}[0,1]\d[0-3]\d')
+
 cmorAttributes = {
     'time_frequency': 'frequency',
     }
@@ -40,7 +42,7 @@ class CMIP6Handler(BasicHandler):
 
 
     def readContext(self, cdfile, model=''):
-        "Get a dictionary of keys from an open file"
+        """Get a dictionary of keys from an open file"""
         result = BasicHandler.readContext(self, cdfile)
         f = cdfile.file
 
@@ -49,6 +51,7 @@ class CMIP6Handler(BasicHandler):
                 result[key] = getattr(f, value)
             except:
                 pass
+        return result
 
 
     def validateFile(self, fileobj):
@@ -59,7 +62,7 @@ class CMIP6Handler(BasicHandler):
         config = getConfig()
         projectSection = 'project:'+self.name
 
-        
+
         min_cmor_version = config.get(projectSection, "min_cmor_version", default="0.0.0")
 
         file_cmor_version = fileobj.getAttribute('cmor_version', None)
@@ -99,7 +102,7 @@ class CMIP6Handler(BasicHandler):
 
 
         cmor_table_path = config.get(projectSection, "cmor_table_path", defaut="")        
-        
+
 
         if cmor_table_path == "":
             raise ESGPublishError("cmor_table_path not set in esg.ini")            
@@ -131,7 +134,7 @@ class CMIP6Handler(BasicHandler):
             raise ESGPublishError("File %s failed the CV check"%f)
 
 
-    def check_pid_avail(self, project_section, config):
+    def check_pid_avail(self, project_section, config, version=None):
         """ Returns the pid_prefix
 
          project_section
@@ -139,15 +142,16 @@ class CMIP6Handler(BasicHandler):
 
         config
             The configuration (ini files)
-        """
-        pid_data_node = urlparse.urlparse(config.get('DEFAULT', 'thredds_url')).netloc
-        hessian_service_url = config.get('DEFAULT', 'hessian_service_url', default=None)
 
-        pid_prefix = config.get(project_section, 'pid_prefix', default=None)
-        if not pid_prefix:
-            info("No PID configs found in section %s, using the defaults" % project_section)
-            pid_prefix = '21.14100'
-        return pid_prefix
+        version
+            Integer or Dict with dataset versions
+        """
+        # disable PIDs for local index that does not use versioning (IPSL use case)
+        if isinstance(version, int) and not version_pattern.match(str(version)):
+            warning('Version %s, skipping PID generation.' % version)
+            return None
+
+        return '21.14100'
 
 
     def get_pid_config(self, project_section, config):
@@ -159,11 +163,19 @@ class CMIP6Handler(BasicHandler):
         config
             The configuration (ini files)
         """
-        pid_ms_urls = config.get(project_section, 'pid_messaging_service_urls', default='handle-esgf.dkrz.de').split(',')
-        pid_ms_exchange = config.get(project_section, 'pid_messaging_service_exchange_name', default='esgffedtest')
-        pid_ms_user = config.get(project_section, 'pid_messaging_service_username', default='publisher')
-        pid_ms_pass = config.get(project_section, 'pid_messaging_service_password', default=None)
-        return pid_ms_urls, pid_ms_exchange, pid_ms_user, pid_ms_pass
+        # get the PID configs
+        pid_ms_exchange_name = 'esgffed-exchange'
+
+        # open Rabbit MQ as fallback
+        pid_ms_urls_open = ['handle-esgf-open.dkrz.de']
+        pid_ms_username_open = 'esgf-publisher-open'
+
+        # trusted Rabbit MQ, configuration update needed
+        pid_ms_url_trusted = config.get(project_section, 'pid_messaging_service_url_trusted', default=None)
+        pid_ms_username_trusted = config.get(project_section, 'pid_messaging_service_username_trusted', default='esgf-publisher')
+        pid_ms_password = config.get(project_section, 'pid_messaging_service_password', default=None)
+
+        return pid_ms_exchange_name, pid_ms_urls_open, pid_ms_username_open, pid_ms_url_trusted, pid_ms_username_trusted, pid_ms_password
 
 
     def get_citation_url(self, project_section, config, dataset_name, dataset_version):
@@ -181,4 +193,4 @@ class CMIP6Handler(BasicHandler):
         dataset_version
             Version of the dataset
         """
-        return 'http://cera-www.dkrz.de/WDCC/meta/CMIP6/%s.v%s' % (dataset_name, dataset_version)
+        return 'http://cera-www.dkrz.de/WDCC/meta/CMIP6/%s.v%s.json' % (dataset_name, dataset_version)

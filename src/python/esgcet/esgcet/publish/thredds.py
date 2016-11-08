@@ -917,16 +917,16 @@ def _generateThreddsV2(datasetName, outputFile, handler, session, dset, context,
 
     # Add citation link if present
     if dsetVersionObj.citation_url is not None:
-        documentation = SE(datasetElem, "documentation", type="citation")
         SE(datasetElem, "property", name="citation_url", value=dsetVersionObj.citation_url)
+        documentation = SE(datasetElem, "documentation", type="citation")
         documentation.set(_XLINK + "href", dsetVersionObj.citation_url)
         documentation.set(_XLINK + "title", "Citation")
 
     # Add link to PID if present
     if dsetVersionObj.pid is not None:
-        documentation = SE(datasetElem, "documentation", type="pid")
         SE(datasetElem, "property", name="pid", value=dsetVersionObj.pid)
-        documentation.set(_XLINK + "href", '%s' %dsetVersionObj.pid)
+        documentation = SE(datasetElem, "documentation", type="pid")
+        documentation.set(_XLINK + "href", 'http://hdl.handle.net/%s' %dsetVersionObj.pid)
         documentation.set(_XLINK + "title", "PID")
 
     datasetIdProp = SE(datasetElem, "property", name="dataset_id", value=datasetName)
