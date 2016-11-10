@@ -71,7 +71,7 @@ setup(
         "requests>=1.2.0",
         "esgprep>=2.6.1",
         "cfchecker>=2.0.9",
-        "esgfpid>=0.4.3"
+        "esgfpid>=0.4.4"
     ],
     setup_requires = [
         "psycopg2>=2.0",
@@ -79,9 +79,6 @@ setup(
         "lxml>=2.0",
         "sqlalchemy_migrate>=0.6",
         "requests>=1.2.0",
-        "esgprep>=2.6.1",
-        "cfchecker>=2.0.9",
-        "esgfpid>=0.4.3"
     ],
     packages = find_packages(exclude=['ez_setup']),
     include_package_data = True,
