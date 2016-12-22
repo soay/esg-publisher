@@ -71,7 +71,7 @@ setup(
         "requests>=1.2.0",
         "esgprep>=2.6.1",
         "cfchecker>=2.0.9",
-        "esgfpid>=0.4.4"
+        "esgfpid>=0.5.1"
     ],
     setup_requires = [
         "psycopg2>=2.0",

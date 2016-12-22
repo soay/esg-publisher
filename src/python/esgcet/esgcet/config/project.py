@@ -989,11 +989,11 @@ class ProjectHandler(object):
         return True
 
 
-    def check_pid_avail(self, project_section, config, version=None):
+    def check_pid_avail(self, project_config_section, config, version=None):
         """ Returns the pid_prefix if project uses PIDs, otherwise returns None
 
-         project_section
-            The name of the project section in the ini file
+         project_config_section
+            The name of the project config section in esg.ini
 
         config
             The configuration (ini files)
@@ -1001,31 +1001,41 @@ class ProjectHandler(object):
         version
             Integer or Dict with dataset versions
         """
-        pid_prefix = config.get(project_section, 'pid_prefix', default=None)
+        pid_prefix = config.get(project_config_section, 'pid_prefix', default=None)
         return pid_prefix
 
 
-    def get_pid_config(self, project_section, config):
+    def get_pid_config(self, project_config_section, config):
         """ Returns the project specific pid config
 
-         project_section
-            The name of the project section in the ini file
+         project_config_section
+            The name of the project config section in esg.ini
 
         config
             The configuration (ini files)
         """
-        # get the PID configs
-        pid_ms_exchange_name = 'esgffed-exchange'
+        pid_ms_exchange_name = config.get(project_config_section, 'pid_ms_exchange_name', default=None)
+        if not pid_ms_exchange_name:
+            raise ESGPublishError("Option 'pid_ms_exchange_name' is missing in section '%s' of esg.ini." % project_config_section)
 
-        pid_ms_urls_open = config.get(project_section, 'pid_messaging_service_urls_open', default=None)
-        pid_ms_username_open = config.get(project_section, 'pid_messaging_service_username_open', default=None)
+        # extract credentials from config:project section of esg.ini
+        if config.has_section(project_config_section):
+            pid_messaging_service_credentials = []
+            credentials = splitRecord(config.get(project_config_section, 'pid_messaging_service_credentials', default=None))
+            if credentials:
+                priority = 0
+                for cred in credentials:
+                    if len(cred) == 4 and isinstance(cred[3], int):
+                        priority = cred[3]
+                    else:
+                        priority += 1
+                        pid_messaging_service_credentials.append({'url': cred[0], 'user': cred[1], 'password': cred[2], 'priority': priority})
+            else:
+                raise ESGPublishError("Option 'pid_messaging_service_credentials' is missing in section '%s' of esg.ini." % project_config_section)
+        else:
+            raise ESGPublishError("Section '%s' was not found in esg.ini." % project_config_section)
 
-        pid_ms_url_trusted = config.get(project_section, 'pid_messaging_service_url_trusted', default=None)
-        pid_ms_username_trusted = config.get(project_section, 'pid_messaging_service_username_trusted', default=None)
-        pid_ms_password = config.get(project_section, 'pid_messaging_service_password', default=None)
-
-        return pid_ms_exchange_name, pid_ms_urls_open, pid_ms_username_open, pid_ms_url_trusted, pid_ms_username_trusted, pid_ms_password
-
+        return pid_ms_exchange_name, pid_messaging_service_credentials
 
     def get_citation_url(self, project_section, config, dataset_name, dataset_version):
         """ Returns the citation_url if a project uses citation, otherwise returns None

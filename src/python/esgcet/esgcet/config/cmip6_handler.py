@@ -134,11 +134,11 @@ class CMIP6Handler(BasicHandler):
             raise ESGPublishError("File %s failed the CV check"%f)
 
 
-    def check_pid_avail(self, project_section, config, version=None):
+    def check_pid_avail(self, project_config_section, config, version=None):
         """ Returns the pid_prefix
 
-         project_section
-            The name of the project section in the ini file
+         project_config_section
+            The name of the project config section in esg.ini
 
         config
             The configuration (ini files)
@@ -154,11 +154,11 @@ class CMIP6Handler(BasicHandler):
         return '21.14100'
 
 
-    def get_pid_config(self, project_section, config):
+    def get_pid_config(self, project_config_section, config):
         """ Returns the project specific pid config
 
-         project_section
-            The name of the project section in the ini file
+         project_config_section
+            The name of the project config section in esg.ini
 
         config
             The configuration (ini files)
@@ -166,16 +166,25 @@ class CMIP6Handler(BasicHandler):
         # get the PID configs
         pid_ms_exchange_name = 'esgffed-exchange'
 
-        # open Rabbit MQ as fallback
-        pid_ms_urls_open = ['handle-esgf-open.dkrz.de']
-        pid_ms_username_open = 'esgf-publisher-open'
+        # extract credentials from config:project section of esg.ini
+        if config.has_section(project_config_section):
+            pid_messaging_service_credentials = []
+            credentials = splitRecord(config.get(project_config_section, 'pid_messaging_service_credentials', default=None))
+            if credentials:
+                priority = 0
+                for cred in credentials:
+                    if len(cred) == 4 and isinstance(cred[3], int):
+                        priority = cred[3]
+                    else:
+                        priority += 1
+                        pid_messaging_service_credentials.append({'url': cred[0], 'user': cred[1], 'password': cred[2], 'priority': priority})
+            else:
+                raise ESGPublishError("Option 'pid_messaging_service_credentials' missing in section '%s' of esg.ini. "
+                       "Please contact your tier1 data node admin to get the proper values." % section)
+        else:
+            raise ESGPublishError("Section '%s' was not found in esg.ini." % project_config_section)
 
-        # trusted Rabbit MQ, configuration update needed
-        pid_ms_url_trusted = config.get(project_section, 'pid_messaging_service_url_trusted', default=None)
-        pid_ms_username_trusted = config.get(project_section, 'pid_messaging_service_username_trusted', default='esgf-publisher')
-        pid_ms_password = config.get(project_section, 'pid_messaging_service_password', default=None)
-
-        return pid_ms_exchange_name, pid_ms_urls_open, pid_ms_username_open, pid_ms_url_trusted, pid_ms_username_trusted, pid_ms_password
+        return pid_ms_exchange_name, pid_messaging_service_credentials
 
 
     def get_citation_url(self, project_section, config, dataset_name, dataset_version):

@@ -11,7 +11,6 @@ import logging
 import subprocess
 import filecmp
 import urlparse
-import esgfpid
 
 from esgcet.config import getHandler, getHandlerByName, splitLine, getConfig, getThreddsServiceSpecs
 from esgcet.exceptions import *
@@ -1000,7 +999,7 @@ def getRestServiceURL():
     return serviceURL
 
 
-def establish_pid_connection(pid_prefix, test_publication, project_section, config, handler, publish=True):
+def establish_pid_connection(pid_prefix, test_publication, project_config_section, config, handler, publish=True):
     """Establish a connection to the PID service
 
     pid_prefix
@@ -1009,8 +1008,8 @@ def establish_pid_connection(pid_prefix, test_publication, project_section, conf
     test_publication
         Boolean to flag PIDs as test
 
-    project_section
-        Name of section for project in ini file
+     project_config_section
+        The name of the project config section in esg.ini
 
     config
         Loaded config file(s)
@@ -1021,7 +1020,13 @@ def establish_pid_connection(pid_prefix, test_publication, project_section, conf
     publish
         Flag to trigger publication and unpublication
     """
-    pid_ms_exchange_name, pid_ms_urls_open, pid_ms_username_open, pid_ms_url_trusted, pid_ms_username_trusted, pid_ms_password = handler.get_pid_config(project_section, config)
+
+    try:
+        import esgfpid
+    except ImportError:
+        raise "PID module not found. Please install the package 'esgfpid' (e.g. with 'pip install')."
+
+    pid_ms_exchange_name, pid_messaging_service_credentials = handler.get_pid_config(project_config_section, config)
     pid_data_node = urlparse.urlparse(config.get('DEFAULT', 'thredds_url')).netloc
     thredds_service_path = None
     if publish:
@@ -1033,13 +1038,10 @@ def establish_pid_connection(pid_prefix, test_publication, project_section, conf
 
     pid_connector = esgfpid.Connector(handle_prefix=pid_prefix,
                                       messaging_service_exchange_name=pid_ms_exchange_name,
-                                      messaging_service_urls_open=pid_ms_urls_open,
-                                      messaging_service_username_open=pid_ms_username_open,
-                                      messaging_service_url_trusted=pid_ms_url_trusted,
-                                      messaging_service_username_trusted=pid_ms_username_trusted,
-                                      messaging_service_password=pid_ms_password,
+                                      messaging_service_credentials = pid_messaging_service_credentials,
                                       data_node=pid_data_node,
                                       thredds_service_path=thredds_service_path,
                                       test_publication=test_publication)
     return pid_connector
+
 

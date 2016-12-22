@@ -241,11 +241,11 @@ def setupconfig():
 def fetch_project_ini():
     # Fetch new esg.<project>.ini files, do not overwrite existing files
     tell("""
-    Fetching new esg.<project>.ini files from github:
-    Running 'esgprep fetch-ini' -k:
+    Fetching esg.test.ini file from github:
+    Running 'esgprep fetch-ini -k --project test':
     """)
     try:
-        subprocess.call(["esgprep", "fetch-ini", "-k"])
+        subprocess.call(["esgprep", "fetch-ini", "-k", "--project", "test"])
     except OSError, e:
         raise OSError("Cannot run esgprep fetch-ini: %s. Is $CDAT_HOME/bin in the path?" % `e`)
 

@@ -45,7 +45,7 @@ class Registry(object):
         self.entryPointGroup = entryPointGroup
         self.registry = {}              # project_name => handler
         self.search_order = {}
-        # self.entry_points: handler_name => (handler, distribution, mustload), for all available distributions
+        # self.entry_points: handler_name => (handler, distribution, mustload), for a<ll available distributions
         # self.entry_points is 'lazy loaded' by loadEntryPoints
         #   If mustload is True, handler is an entry point that must be loaded to get the class
         #   else if mustload is False, the handler is already a class (e.g. a builtin handler)
